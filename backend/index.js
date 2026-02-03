@@ -13,16 +13,27 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ---------------- CORS (FIXED) ----------------
+import cors from "cors";
+
+/**
+ * CORS must be FIRST middleware
+ */
 app.use(
   cors({
     origin: [
       "http://localhost:5173",
       "https://stt-project.vercel.app",
     ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: false,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "x-user-id"],
   })
 );
+
+/**
+ * Handle preflight requests explicitly
+ */
+app.options("*", cors());
 
 // ---------------- MIDDLEWARE ----------------
 app.use(express.json());
