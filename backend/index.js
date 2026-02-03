@@ -16,24 +16,32 @@ const PORT = process.env.PORT || 5000;
 import cors from "cors";
 
 /**
- * CORS must be FIRST middleware
+ * CORS — MUST be before everything
  */
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "https://stt-project.vercel.app",
-    ],
-    credentials: false,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "x-user-id"],
-  })
-);
+import cors from "cors";
 
 /**
- * Handle preflight requests explicitly
+ * CORS — MUST be before everything
  */
-app.options("*", cors());
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, x-user-id"
+  );
+  res.header(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+
+  // IMPORTANT: short-circuit preflight
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
 
 // ---------------- MIDDLEWARE ----------------
 app.use(express.json());
