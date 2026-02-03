@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabase";
 
+const API_BASE = import.meta.env.VITE_API_URL;
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -19,15 +21,13 @@ export default function App() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // ---------------- AUTH STATE (FIX) ----------------
+  // ---------------- AUTH STATE ----------------
   useEffect(() => {
-    // Initial session check
     supabase.auth.getSession().then(({ data }) => {
       setUser(data?.session?.user || null);
       setAuthLoading(false);
     });
 
-    // Listen to auth changes
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user || null);
@@ -43,7 +43,7 @@ export default function App() {
   // ---------------- DATA ----------------
   const fetchHistory = async (uid) => {
     try {
-      const res = await fetch("https://stt-backend.onrender.com/history", {
+      const res = await fetch(`${API_BASE}/history`, {
         headers: { "x-user-id": uid },
       });
       const data = await res.json();
@@ -57,7 +57,7 @@ export default function App() {
     if (user) fetchHistory(user.id);
   }, [user]);
 
-  // ---------------- AUTH ACTIONS ----------------
+  // ---------------- AUTH ----------------
   const signIn = async () => {
     setError("");
     const { error } = await supabase.auth.signInWithPassword({
@@ -93,15 +93,13 @@ export default function App() {
     formData.append("audio", file);
 
     try {
-      const res = await fetch("https://stt-backend.onrender.com/transcribe", {
+      const res = await fetch(`${API_BASE}/transcribe`, {
         method: "POST",
         headers: { "x-user-id": user.id },
         body: formData,
       });
 
-      const text = await res.text();
-      const data = JSON.parse(text);
-
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
       setTranscript(data.transcript);
@@ -118,22 +116,15 @@ export default function App() {
     if (!confirm("Delete this transcription?")) return;
 
     try {
-      const res = await fetch(
-        `https://stt-backend.onrender.com/history/${id}`,
-        {
-          method: "DELETE",
-          headers: { "x-user-id": user.id },
-        }
-      );
+      const res = await fetch(`${API_BASE}/history/${id}`, {
+        method: "DELETE",
+        headers: { "x-user-id": user.id },
+      });
 
-      const text = await res.text();
-      const data = JSON.parse(text);
-
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setHistory((prev) =>
-        prev.filter((item) => item._id !== id)
-      );
+      setHistory((prev) => prev.filter((item) => item._id !== id));
     } catch (err) {
       setError(err.message);
     }
@@ -163,15 +154,13 @@ export default function App() {
         formData.append("audio", audioBlob, "recording.webm");
 
         try {
-          const res = await fetch("https://stt-backend.onrender.com/transcribe", {
+          const res = await fetch(`${API_BASE}/transcribe`, {
             method: "POST",
             headers: { "x-user-id": user.id },
             body: formData,
           });
 
-          const text = await res.text();
-          const data = JSON.parse(text);
-
+          const data = await res.json();
           if (!res.ok) throw new Error(data.error);
 
           setTranscript(data.transcript);
@@ -195,7 +184,7 @@ export default function App() {
     setRecording(false);
   };
 
-  // ---------------- LOADING SCREEN ----------------
+  // ---------------- LOADING ----------------
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
@@ -204,7 +193,7 @@ export default function App() {
     );
   }
 
-  // ---------------- LOGIN UI ----------------
+  // ---------------- LOGIN ----------------
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
@@ -238,10 +227,7 @@ export default function App() {
             Sign In
           </button>
 
-          <button
-            onClick={signUp}
-            className="w-full border py-2 rounded"
-          >
+          <button onClick={signUp} className="w-full border py-2 rounded">
             Sign Up
           </button>
         </div>
@@ -272,6 +258,7 @@ export default function App() {
             accept="audio/*"
             onChange={(e) => setFile(e.target.files[0])}
           />
+
           <button
             onClick={uploadAudio}
             disabled={loading || recording}
@@ -299,9 +286,7 @@ export default function App() {
           </div>
 
           {loading && (
-            <p className="text-sm text-gray-500 mt-2">
-              Transcribing…
-            </p>
+            <p className="text-sm text-gray-500 mt-2">Transcribing…</p>
           )}
         </div>
 

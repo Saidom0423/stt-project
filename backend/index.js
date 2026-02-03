@@ -12,20 +12,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ---------------- CORS (FIXED) ----------------
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://stt-project.vercel.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "x-user-id"],
+  })
+);
+
+// ---------------- MIDDLEWARE ----------------
+app.use(express.json());
+
 // ---------------- DB ----------------
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
-
-app.use(cors());
-app.use(express.json());
-
-// 🔒 Force JSON errors (IMPORTANT)
-app.use((req, res, next) => {
-  res.setHeader("Content-Type", "application/json");
-  next();
-});
 
 // ---------------- MULTER ----------------
 const storage = multer.diskStorage({
@@ -38,12 +44,12 @@ const upload = multer({ storage });
 
 // ---------------- ROUTES ----------------
 
-// Health
+// Health check
 app.get("/", (req, res) => {
   res.json({ status: "Backend OK" });
 });
 
-// 🔥 TRANSCRIBE
+// 🎙️ TRANSCRIBE
 app.post("/transcribe", upload.single("audio"), async (req, res) => {
   try {
     const userId = req.headers["x-user-id"];
@@ -102,7 +108,7 @@ app.get("/history", async (req, res) => {
   res.json(history);
 });
 
-// 🗑️ DELETE HISTORY (CRITICAL)
+// 🗑️ DELETE HISTORY
 app.delete("/history/:id", async (req, res) => {
   try {
     const userId = req.headers["x-user-id"];
@@ -121,19 +127,19 @@ app.delete("/history/:id", async (req, res) => {
       return res.status(404).json({ error: "Transcription not found" });
     }
 
-    return res.json({ success: true });
+    res.json({ success: true });
   } catch (err) {
     console.error("DELETE ERROR:", err);
-    return res.status(500).json({ error: "Delete failed" });
+    res.status(500).json({ error: "Delete failed" });
   }
 });
 
-// ❌ CATCH-ALL (IMPORTANT)
+// ❌ 404
 app.use((req, res) => {
   res.status(404).json({ error: "Route not found" });
 });
 
 // ---------------- START ----------------
 app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`Backend running on port ${PORT}`);
 });
