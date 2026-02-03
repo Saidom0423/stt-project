@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 const API_BASE = import.meta.env.VITE_API_URL;
 
 export default function App() {
+  /* ---------------- STATE ---------------- */
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -16,12 +17,19 @@ export default function App() {
 
   const [loading, setLoading] = useState(false);
   const [recording, setRecording] = useState(false);
-  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [dark, setDark] = useState(true);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // ---------------- AUTH STATE ----------------
+  /* ---------------- TOAST ---------------- */
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  };
+
+  /* ---------------- AUTH STATE ---------------- */
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setUser(data?.session?.user || null);
@@ -31,16 +39,13 @@ export default function App() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user || null);
-        setAuthLoading(false);
       }
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, []);
 
-  // ---------------- DATA ----------------
+  /* ---------------- DATA ---------------- */
   const fetchHistory = async (uid) => {
     try {
       const res = await fetch(`${API_BASE}/history`, {
@@ -49,7 +54,7 @@ export default function App() {
       const data = await res.json();
       setHistory(data);
     } catch {
-      setError("Failed to load history");
+      showToast("Failed to load history");
     }
   };
 
@@ -57,37 +62,34 @@ export default function App() {
     if (user) fetchHistory(user.id);
   }, [user]);
 
-  // ---------------- AUTH ----------------
+  /* ---------------- AUTH ACTIONS ---------------- */
   const signIn = async () => {
-    setError("");
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    if (error) setError(error.message);
+    if (error) showToast(error.message);
   };
 
   const signUp = async () => {
-    setError("");
     const { error } = await supabase.auth.signUp({
       email,
       password,
     });
-    if (error) setError(error.message);
-    else alert("Check your email to confirm signup");
+    if (error) showToast(error.message);
+    else showToast("Check email to confirm signup");
   };
 
   const logout = async () => {
     await supabase.auth.signOut();
   };
 
-  // ---------------- UPLOAD ----------------
+  /* ---------------- UPLOAD ---------------- */
   const uploadAudio = async () => {
-    if (!file) return setError("Please select an audio file");
+    if (!file) return showToast("Please select an audio file");
 
     setLoading(true);
     setTranscript("");
-    setError("");
 
     const formData = new FormData();
     formData.append("audio", file);
@@ -105,16 +107,14 @@ export default function App() {
       setTranscript(data.transcript);
       fetchHistory(user.id);
     } catch (err) {
-      setError(err.message);
+      showToast(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // ---------------- DELETE ----------------
+  /* ---------------- DELETE ---------------- */
   const deleteHistory = async (id) => {
-    if (!confirm("Delete this transcription?")) return;
-
     try {
       const res = await fetch(`${API_BASE}/history/${id}`, {
         method: "DELETE",
@@ -125,26 +125,25 @@ export default function App() {
       if (!res.ok) throw new Error(data.error);
 
       setHistory((prev) => prev.filter((item) => item._id !== id));
+      showToast("Deleted successfully");
     } catch (err) {
-      setError(err.message);
+      showToast(err.message || "Delete failed");
     }
   };
 
-  // ---------------- RECORD ----------------
+  /* ---------------- RECORD ---------------- */
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
 
-      mediaRecorderRef.current.ondataavailable = (e) => {
+      mediaRecorderRef.current.ondataavailable = (e) =>
         audioChunksRef.current.push(e.data);
-      };
 
       mediaRecorderRef.current.onstop = async () => {
         setLoading(true);
         setTranscript("");
-        setError("");
 
         const audioBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
@@ -166,7 +165,7 @@ export default function App() {
           setTranscript(data.transcript);
           fetchHistory(user.id);
         } catch (err) {
-          setError(err.message);
+          showToast(err.message);
         } finally {
           setLoading(false);
         }
@@ -175,7 +174,7 @@ export default function App() {
       mediaRecorderRef.current.start();
       setRecording(true);
     } catch {
-      setError("Microphone permission denied");
+      showToast("Microphone permission denied");
     }
   };
 
@@ -184,29 +183,23 @@ export default function App() {
     setRecording(false);
   };
 
-  // ---------------- LOADING ----------------
+  /* ---------------- LOADING ---------------- */
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
-        <p>Loading…</p>
+        Loading…
       </div>
     );
   }
 
-  // ---------------- LOGIN ----------------
+  /* ---------------- LOGIN ---------------- */
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="bg-white p-8 rounded-xl w-80">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black to-gray-900">
+        <div className="bg-white/90 backdrop-blur p-8 rounded-2xl w-80 shadow-2xl">
           <h1 className="text-2xl font-bold mb-6 text-center">
-            🎙️ Speech-to-Text
+            🎙️ Speech<span className="text-indigo-600">2</span>Text
           </h1>
-
-          {error && (
-            <div className="bg-red-100 text-red-700 p-2 mb-3 rounded text-sm">
-              {error}
-            </div>
-          )}
 
           <input
             className="border p-2 rounded w-full mb-3"
@@ -222,12 +215,15 @@ export default function App() {
 
           <button
             onClick={signIn}
-            className="w-full bg-black text-white py-2 rounded mb-2"
+            className="w-full bg-indigo-600 text-white py-2 rounded mb-2"
           >
             Sign In
           </button>
 
-          <button onClick={signUp} className="w-full border py-2 rounded">
+          <button
+            onClick={signUp}
+            className="w-full border py-2 rounded"
+          >
             Sign Up
           </button>
         </div>
@@ -235,24 +231,27 @@ export default function App() {
     );
   }
 
-  // ---------------- MAIN UI ----------------
+  /* ---------------- MAIN UI ---------------- */
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-black text-white p-4 flex justify-between">
-        <h1>🎙️ Speech-to-Text</h1>
-        <button onClick={logout} className="text-sm">
-          Logout
-        </button>
+    <div
+      className={`min-h-screen ${
+        dark ? "bg-gray-950 text-white" : "bg-gray-100 text-black"
+      }`}
+    >
+      {/* Header */}
+      <header className="flex justify-between items-center px-6 py-4 border-b border-gray-800">
+        <h1 className="font-bold text-lg">🎙️ Speech2Text</h1>
+        <div className="flex gap-4 items-center">
+          <button onClick={() => setDark(!dark)}>🌙</button>
+          <button onClick={logout} className="text-sm text-red-400">
+            Logout
+          </button>
+        </div>
       </header>
 
-      <main className="max-w-4xl mx-auto p-6">
-        {error && (
-          <div className="bg-red-100 text-red-700 p-3 mb-4 rounded">
-            {error}
-          </div>
-        )}
-
-        <div className="bg-white p-6 rounded-xl shadow mb-6">
+      <main className="max-w-3xl mx-auto p-6 space-y-6">
+        {/* Upload / Record */}
+        <div className="bg-gray-900 p-6 rounded-2xl shadow-xl">
           <input
             type="file"
             accept="audio/*"
@@ -262,7 +261,7 @@ export default function App() {
           <button
             onClick={uploadAudio}
             disabled={loading || recording}
-            className="ml-2 px-4 py-2 bg-black text-white rounded"
+            className="ml-3 px-4 py-2 bg-indigo-600 rounded text-white disabled:opacity-50"
           >
             Upload
           </button>
@@ -271,14 +270,14 @@ export default function App() {
             {!recording ? (
               <button
                 onClick={startRecording}
-                className="border px-4 py-2 rounded"
+                className="px-4 py-2 bg-emerald-600 rounded text-white"
               >
                 🎙️ Start Recording
               </button>
             ) : (
               <button
                 onClick={stopRecording}
-                className="bg-red-500 text-white px-4 py-2 rounded"
+                className="px-4 py-2 bg-red-600 rounded text-white animate-pulse"
               >
                 ⏹️ Stop Recording
               </button>
@@ -286,23 +285,32 @@ export default function App() {
           </div>
 
           {loading && (
-            <p className="text-sm text-gray-500 mt-2">Transcribing…</p>
+            <div className="mt-4 h-3 bg-gray-700 rounded animate-pulse" />
           )}
         </div>
 
+        {/* Transcript */}
         {transcript && (
-          <div className="bg-white p-4 rounded shadow mb-6">
-            <h2 className="font-semibold mb-1">Latest Transcript</h2>
-            <p>{transcript}</p>
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-5 rounded-2xl shadow-xl">
+            <h2 className="font-semibold mb-2">✨ Latest Transcript</h2>
+            <p className="leading-relaxed">{transcript}</p>
           </div>
         )}
 
-        <h2 className="text-xl font-semibold mb-3">History</h2>
+        {/* History */}
+        <h2 className="text-xl font-semibold">History</h2>
+
+        {history.length === 0 && (
+          <p className="text-sm text-gray-400">
+            No transcriptions yet 🎧
+          </p>
+        )}
+
         <div className="space-y-3">
           {history.map((h) => (
             <div
               key={h._id}
-              className="bg-white p-4 rounded shadow flex justify-between"
+              className="bg-gray-900 p-4 rounded-xl flex justify-between items-start"
             >
               <div>
                 <p>{h.text}</p>
@@ -312,7 +320,7 @@ export default function App() {
               </div>
               <button
                 onClick={() => deleteHistory(h._id)}
-                className="text-red-500 text-sm"
+                className="text-sm text-red-400 hover:text-red-500"
               >
                 Delete
               </button>
@@ -320,6 +328,13 @@ export default function App() {
           ))}
         </div>
       </main>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-xl shadow-xl">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }
